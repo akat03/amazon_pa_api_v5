@@ -1,8 +1,10 @@
 <?php
 
+/* This software includes the work that is distributed in the Apache License 2.0. */
 /* Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved. */
 /* Licensed under the Apache License, Version 2.0. */
 
+namespace Akat03\Amazon_pa_api_v5;
 
 class Amazon_pa_api_v5 {
 
@@ -231,68 +233,3 @@ class AwsV4 {
 
 
 
-    //========== dump：ダンプ
-    function dump($data)
-    {
-        print "\n".'<pre style="text-align:left;">'."\n";
-        print_r($data);
-        print "</pre>\n\n";
-    }
-
-
-
-
-
-
-
-
-
-function d()
-{
-    // 全引数の var_dump() の出力内容を変数に取り出し
-    ob_start();
-    foreach (func_get_args() as $arg) {
-        var_dump($arg);
-    }
-    $dump = ob_get_clean();
-
-    // 可読性のためインデント幅を2倍に (2 -> 4)
-    $dump = preg_replace_callback(
-        '/^\s++/m',
-        function ($m) {
-            return str_repeat(" ", strlen($m[0]) * 2);
-        },
-        $dump
-    );
-
-    // この関数の呼び出し元を取得 （ファイルパス・行番号）
-    $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1)[0];
-
-    // ヘッダーの HTML を生成
-    $header = sprintf('<pre style="%s">', implode(';', [
-        'border: 1px solid #bbb',
-        'margin: 2px',
-        'padding: 6px',
-        'solid: #bbb',
-        'text-align: left',
-        'background: #fdfdfd',
-        'color: #000',
-        'font-family: monospace,serif',
-        'font-size: 13px',
-    ]));
-    $header .= sprintf('<span style="%s">%s:%d</span>',
-        implode(';', ['font-weight: bold']),
-        $caller['file'],
-        $caller['line']
-    );
-    $header .= PHP_EOL;
-
-    // フッターの HTML を生成
-    $footer = '</pre>' . PHP_EOL;
-
-    // ダンプ内容を出力 (CLI で実行された場合は HTML タグを取り除く)
-    $isCli = (php_sapi_name() === 'cli');
-    echo $isCli ? strip_tags($header) : $header;
-    echo $dump;
-    echo $isCli ? strip_tags($footer) : $footer;
-}
