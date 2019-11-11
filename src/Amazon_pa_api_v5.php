@@ -35,7 +35,7 @@ class Amazon_pa_api_v5
 
         $this->optionRetryMax = 3;              // x times retry
         $this->optionShowRetryError = true;
-        $this->$optionAccessWait = 2;           // second
+        $this->optionAccessWait = 2;           // second
 
 
         if (empty($option)) {
@@ -154,7 +154,7 @@ OFF*/
                 // dump($data['Errors']);
                 if ( $data['Errors'][0]['Code'] === 'TooManyRequests' ){
                     if ( $this->optionShowRetryError ){
-                        print("<strong>API ERROR: TooManyRequests: Retry " .$this->$optionAccessWait. "second. </strong>");
+                        print("<strong>API ERROR: TooManyRequests: Retry " .$this->optionAccessWait. "second. </strong>");
                     }
                 }
                 else {
