@@ -16,6 +16,10 @@ class Amazon_pa_api_v5
 
     // Put your Secret Key in place of **********
 
+    private $optionRetryMax;
+    private $optionShowRetryError;
+    private $optionAccessWait;
+
     private $serviceName;
     private $region;
     private $accessKey;
@@ -28,6 +32,10 @@ class Amazon_pa_api_v5
 
     public function __construct(array $option = [])
     {
+
+        $this->optionRetryMax = 3;              // x times retry
+        $this->optionShowRetryError = true;
+        $this->$optionAccessWait = 2;           // second
 
 
         if (empty($option)) {
@@ -113,8 +121,6 @@ class Amazon_pa_api_v5
 OFF*/
 
 
-
-
         // 2. guzzle
         // ===== guzzle handler
         // $handler_stack = HandlerStack::create();
@@ -129,22 +135,50 @@ OFF*/
         $client = new \GuzzleHttp\Client([
             // [\GuzzleHttp\RequestOptions::VERIFY => false]
         ]);
-        $response = $client->post($url, [
-            'http_errors' => false ,
-            // 'debug'   => true ,
-            'headers' => $headers,
-            'body'    => $payload,
-        ] );
 
-        $data = (string) $response->getBody();
+
+        $response = null;
+        $data     = '';
+
+        for ($i=0; $i < $this->optionRetryMax; $i++) {
+            $response = $client->post($url, [
+                'http_errors' => false ,
+                // 'debug'   => true ,
+                'headers' => $headers,
+                'body'    => $payload,
+            ] );
+            $data = (string) $response->getBody();
+
+            // on Error
+            if ( isset($data['Errors']) ){
+                // dump($data['Errors']);
+                if ( $data['Errors'][0]['Code'] === 'TooManyRequests' ){
+                    if ( $this->optionShowRetryError ){
+                        print("<strong>API ERROR: TooManyRequests: Retry " .$this->$optionAccessWait. "second. </strong>");
+                    }
+                }
+                else {
+                    throw new \Exception("API ERROR: Code: " . $data['Errors'][0]['Code'] . ' Message: '. $data['Errors'][0]['Message']);
+                    die;
+                }
+            }
+            // on Success
+            else {
+                break;
+            }
+
+        }
+
+
 
         $array = json_decode($data, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            die("JSON DECODE ERROR in FILE-NAME.json");
+            die("JSON DECODE ERROR in API json response");
         }
-        return $array; // var_dump の 代わりのダンプ関数
-        // kato
+        return $array;
+
     }
+
 
 
     /**
@@ -158,6 +192,7 @@ OFF*/
         print_r($data);
         print "</pre>\n\n";
     }
+
 
 
     /**
