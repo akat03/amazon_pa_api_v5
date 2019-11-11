@@ -13,9 +13,6 @@ use Psr\Http\Message\RequestInterface;
 
 class Amazon_pa_api_v5
 {
-
-    // Put your Secret Key in place of **********
-
     private $optionRetryMax;
     private $optionShowRetryError;
     private $optionAccessWait;
@@ -34,8 +31,8 @@ class Amazon_pa_api_v5
     {
 
         $this->optionRetryMax = 3;              // x times retry
-        $this->optionShowRetryError = true;
-        $this->optionAccessWait = 2;           // second
+        $this->optionShowRetryError = true;		// Show Throttle Error Message
+        $this->optionAccessWait = 2;            // second(s)
 
 
         if (empty($option)) {
@@ -136,11 +133,13 @@ OFF*/
             // [\GuzzleHttp\RequestOptions::VERIFY => false]
         ]);
 
-
         $response = null;
         $data     = '';
 
-        for ($i=0; $i < $this->optionRetryMax; $i++) {
+        for ($i=1; $i <= $this->optionRetryMax; $i++) {
+			$my_exec_time = microtime(true);
+        	$now_time = $this->format_microtime($my_exec_time,"eTP : Y-m-d H:i:s");
+        	echo $i."回目のトライです ({$now_time})<br>";
             $response = $client->post($url, [
                 'http_errors' => false ,
                 // 'debug'   => true ,
@@ -148,17 +147,20 @@ OFF*/
                 'body'    => $payload,
             ] );
             $data = (string) $response->getBody();
+	        $array = json_decode($data, true);
 
             // on Error
-            if ( isset($data['Errors']) ){
-                // dump($data['Errors']);
-                if ( $data['Errors'][0]['Code'] === 'TooManyRequests' ){
+            if ( isset($array['Errors']) ){
+                // $this->dump($array['Errors']);
+                if ( $array['Errors'][0]['Code'] === 'TooManyRequests' ){
                     if ( $this->optionShowRetryError ){
-                        print("<strong>API ERROR: TooManyRequests: Retry " .$this->optionAccessWait. "second. </strong>");
+                        print("<div style='font-weight:bold;'>API ERROR: TooManyRequests: retry after " .$this->optionAccessWait. " second(s). </div>");
+                        // $this->dump( $this->optionAccessWait );
+                        sleep( $this->optionAccessWait );
                     }
                 }
                 else {
-                    throw new \Exception("API ERROR: Code: " . $data['Errors'][0]['Code'] . ' Message: '. $data['Errors'][0]['Message']);
+                    throw new \Exception("API ERROR: Code: " . $array['Errors'][0]['Code'] . ' Message: '. $array['Errors'][0]['Message']);
                     die;
                 }
             }
@@ -166,14 +168,10 @@ OFF*/
             else {
                 break;
             }
-
         }
 
-
-
-        $array = json_decode($data, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            die("JSON DECODE ERROR in API json response");
+        	throw new \Exception("JSON DECODE ERROR in API json response");
         }
         return $array;
 
@@ -251,7 +249,25 @@ OFF*/
         echo $isCli ? strip_tags($footer) : $footer;
     }
 
+
+    private function format_microtime ( $time, $format = null )
+	{
+	   if (is_string($format)) {
+	            $sec  = (int)$time;
+	         $msec = (int)(($time - $sec) * 100000);
+	            $formated = date($format, $sec). '.'. $msec;
+	     } else {
+	         $formated = sprintf('%0.5f', $time);
+	    }
+	    return $formated;
+	}
+
+
+
+
 }
+
+
 
 class AwsV4
 {
