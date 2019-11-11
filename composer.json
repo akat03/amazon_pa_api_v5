@@ -1,0 +1,14 @@
+{
+    "name": "hogehoge/hellocomposer",
+    "description": "amazon_pa_api_v5",
+    "type": "library",
+    "minimum-stability": "stable" ,
+	"require": {
+		"php": ">=7.0.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"Akat03\\Amazon_pa_api_v5\\": "src/"
+		}
+	}
+}
