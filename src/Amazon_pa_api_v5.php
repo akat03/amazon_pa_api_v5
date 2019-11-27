@@ -27,6 +27,9 @@ class Amazon_pa_api_v5
     private $partnerType;
     private $marketplace;
 
+    public $hasError;
+    public $errorMessage;
+
     public function __construct(array $option = [])
     {
 
@@ -133,6 +136,9 @@ OFF*/
             // [\GuzzleHttp\RequestOptions::VERIFY => false]
         ]);
 
+        $this->hasError = false;
+        $this->errorMessage = null;
+
         $response = null;
         $data     = '';
 
@@ -159,7 +165,15 @@ OFF*/
                         sleep( $this->optionAccessWait );
                     }
                 }
+                elseif ( $array['Errors'][0]['Code'] === 'NoResults' ){
+                    // Error
+                    $this->hasError = true;
+                    $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
+                    return $array;
+                }
                 else {
+                    $this->hasError = true;
+                    $this->errorMessage = $array['Errors'][0]['Message'];
                     throw new \Exception("API ERROR: Code: " . $array['Errors'][0]['Code'] . ' Message: '. $array['Errors'][0]['Message']);
                     die;
                 }

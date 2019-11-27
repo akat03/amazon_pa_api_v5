@@ -4,7 +4,8 @@
     "type": "library",
     "minimum-stability": "stable" ,
 	"require": {
-		"php": ">=7.0.0"
+		"php": ">=7.0.0" ,
+		"phpfastcache/phpfastcache": "*"
 	},
 	"autoload": {
 		"psr-4": {
