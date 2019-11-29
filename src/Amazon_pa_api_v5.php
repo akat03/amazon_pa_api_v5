@@ -17,6 +17,12 @@ class Amazon_pa_api_v5
     private $optionShowRetryError;
     private $optionAccessWait;
 
+    private $optionCache;
+    private $optionCacheDir;
+    private $optionCacheLifetime;
+
+    private $cache;
+
     private $serviceName;
     private $region;
     private $accessKey;
@@ -27,16 +33,36 @@ class Amazon_pa_api_v5
     private $partnerType;
     private $marketplace;
 
+    public $dumpMode;
+
+
     public $hasError;
     public $errorMessage;
 
     public function __construct(array $option = [])
     {
+        $this->dumpMode = 0;
 
         $this->optionRetryMax = 3;              // x times retry
         $this->optionShowRetryError = true;		// Show Throttle Error Message
         $this->optionAccessWait = 2;            // second(s)
 
+        $this->optionCache         = @$option['optionCache'];
+        $this->optionCacheDir      = @$option['optionCacheDir'];
+        $this->optionCacheLifetime = @$option['optionCacheLifetime'];
+
+        if ( $this->optionCache ){
+            $cache_options = array(
+                'cacheDir'                => $this->optionCacheDir,
+                'caching'                 => 'true',    // キャッシュを有効に
+                'automaticSerialization'  => 'true',    // 配列を保存可能に
+                'lifeTime'                => $this->optionCacheLifetime,    // 60*30（生存時間：30分）
+                'automaticCleaningFactor' => 200,    // 自動で古いファイルを削除（1/200の確率で実行）
+                'hashedDirectoryLevel'    => 1,        // ディレクトリ階層の深さ（高速になる）
+            );
+            $this->cache = new \Cache_Lite( $cache_options );
+            // OFF $this->cache = CacheManager::getInstance('files');
+        }
 
         if (empty($option)) {
             throw new Exception('------------引数($option)がありません！！------------');
@@ -73,6 +99,20 @@ class Amazon_pa_api_v5
         $payload_array['Marketplace'] = $this->marketplace;
 
         $payload = json_encode($payload_array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        // get Cache
+        $cache_id = sha1( $payload );
+        $cache_exists = 0;
+        $array = [];
+        if( $this->optionCache == 1 ){
+            list($cache_exists, $array) = $this->_get_cache( $cache_id );
+		}
+        if ( $cache_exists == 1 ){
+            $array['_cache_matched'] = 1;
+			return $array;
+		}
+
+
         $host = "webservices.amazon.co.jp";
         $uriPath = $this->uriPath;
         $awsv4 = new AwsV4($this->accessKey, $this->secretKey);
@@ -101,6 +141,8 @@ class Amazon_pa_api_v5
         // $stream = stream_context_create($params);
 
         $url = 'https://' . $host . $uriPath;
+
+
 
 /*OFF
         // 1. file_get_contents
@@ -144,8 +186,8 @@ OFF*/
 
         for ($i=1; $i <= $this->optionRetryMax; $i++) {
 			$my_exec_time = microtime(true);
-        	$now_time = $this->format_microtime($my_exec_time,"eTP : Y-m-d H:i:s");
-        	echo $i."回目のトライです ({$now_time})<br>";
+            $now_time = $this->format_microtime($my_exec_time,"e T P : Y-m-d H:i:s");
+            if ($this->dumpMode == 1){ $this->dump( $i."回目のトライです ({$now_time})" ); }
             $response = $client->post($url, [
                 'http_errors' => false ,
                 // 'debug'   => true ,
@@ -171,6 +213,12 @@ OFF*/
                     $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
                     return $array;
                 }
+                elseif ( $array['Errors'][0]['Code'] === 'InvalidParameterValue' ){
+                    // Error
+                    $this->hasError = true;
+                    $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
+                    return $array;
+                }
                 else {
                     $this->hasError = true;
                     $this->errorMessage = $array['Errors'][0]['Message'];
@@ -187,6 +235,31 @@ OFF*/
         if (json_last_error() !== JSON_ERROR_NONE) {
         	throw new \Exception("JSON DECODE ERROR in API json response");
         }
+
+
+        // set cache
+		if( $this->optionCache == 1 ){
+			$rt = $this->cache->save($array,$cache_id);
+			if( !$rt ){
+                $this->dump( "Amazon_pa_api Cache Save Error : Check this directory -> [{$this->optionCacheDir}]" );
+            }
+            if ( $this->cache ){
+                $this->dump( "キャッシュに保存しました。: {$cache_id}" );
+            }
+		}
+
+        // if ( $this->optionCache ){
+        //     // cache
+        //     phpFastCache::$storage = "files";
+        //     phpFastCache::$path = $this->optionCacheDir;
+
+        //     $cache_id = sha1( serialize($array) );
+        //     $this->dump( $cache_id ); die;
+        //     if($array != null) {
+        //         phpFastCache::set($cache_id, $array, $this->optionCacheLifetime);
+        //     }
+        // }
+
         return $array;
 
     }
@@ -194,14 +267,47 @@ OFF*/
 
 
     /**
+     * Get Cache
+     *
+     * @param   string         $cache_id
+     *
+     * @return array           [ result_code(1 or 0), $cache_data ]
+     *
+     */
+    function _get_cache( string $cache_id = '' )
+    {
+		if ( strcmp($cache_id,'')==0 ){ die("exaws ERROR : please set cache_id"); }
+
+        // キャッシュデータがあるかどうかの判別
+        $cache_data = null;
+        $cache_data = $this->cache->get($cache_id);
+		if( $cache_data != false ){
+            if( $this->optionCache == 1 ){
+                $this->dump('Cache matched: ',"_get_cache('{$cache_id}')");
+                // $this->dump( $cache_data,'取得したキャッシュデータ' );
+			}
+            return array(1, $cache_data);
+		}
+		else{
+			return array(0, false);
+		}
+	}
+
+
+
+    /**
      * dump method
      *
-     * @param   mix         $arg
+     * @param   mix            $arg
+     * @param   string         $title
      */
-    function dump($data)
+    function dump( $data, string $title='' )
     {
-        print "\n".'<pre style="text-align:left;border: solid red 1px; padding: 10px; margin: 10px 0; background:#fafafa; overflow:scroll;">'."\n";
+        print "\n".'<pre style="position:relative; text-align:left;border: solid red 1px; padding: 10px; margin: 10px 0; background:#fafafa; overflow:scroll; width:95%; max-height:80vh;">'."\n";
         print_r($data);
+        if ( $title ){
+            print "<span style='border: solid #777 1px; padding: 5px;position:absolute;top:5px;right:0;'>{$title}</span>";
+        }
         print "</pre>\n\n";
     }
 
