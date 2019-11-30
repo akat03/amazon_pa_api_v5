@@ -5,7 +5,7 @@
     "minimum-stability": "stable" ,
 	"require": {
 		"php": ">=7.0.0" ,
-		"phpfastcache/phpfastcache": "*"
+		"pear/cache_lite": "*",
 	},
 	"autoload": {
 		"psr-4": {
