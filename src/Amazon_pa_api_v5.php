@@ -4,6 +4,10 @@
 /* Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved. */
 /* Licensed under the Apache License, Version 2.0. */
 
+/*
+    @version        0.5     a 〜 z連続 検索追加
+*/
+
 namespace Akat03\Amazon_pa_api_v5;
 
 use GuzzleHttp\Client;
@@ -78,6 +82,62 @@ class Amazon_pa_api_v5
         $this->partnerType = $option['PartnerType'];
         $this->marketplace = $option['Marketplace'];
     }
+
+
+
+    /**
+     * Search Keywords A to Z
+     *
+     * @param   array       $payload_array
+     *
+     * @return  array       $array
+     *
+     */
+    public function exec_atoz( array $payload_array = [] )
+    {
+        $keyword_array = [
+            '*'
+            // 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'
+            // 'a','e','i','o','u','x','y','z','t','s'
+        ];
+
+        $collection = [];
+        $out_data = [];
+
+        // a - z 検索
+        foreach ($keyword_array as $keyword) {
+            $payload_array["Keywords"] = $keyword;
+            // API exec
+            $data = $this->exec($payload_array);
+            $result_array = $data['SearchResult']['Items'];
+
+            // $this->dump( "<h1>{$payload_array["Keywords"]} の結果</h1>" );
+            foreach ($result_array as $k => $v) {
+                // $this->dump( "{$v['ASIN']} : {$v['ItemInfo']['Title']['DisplayValue']}" );
+
+                $push_flag = 1;
+                foreach ($collection as $c) {
+                    if ( strcmp($v['ASIN'], $c['ASIN']) == 0 ){
+                        // すでに登録済み
+                        $push_flag = 0;
+                        break;
+                    }
+                }
+
+                if ( $push_flag == 1 ){
+                        $collection[] = $v;
+                }
+            }
+        }
+
+        // $this->dump( count($collection) );
+        // $this->dump( $collection );
+
+        $out_data = $data;
+        $out_data['SearchResult']['Items'] = $collection;
+        return $out_data;
+    }
+
 
 
     /**
