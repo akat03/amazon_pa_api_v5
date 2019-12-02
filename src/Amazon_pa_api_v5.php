@@ -6,6 +6,7 @@
 
 /*
     @version        0.5     a 〜 z連続 検索追加
+    @version        0.6     [del]exec_atoz
 */
 
 namespace Akat03\Amazon_pa_api_v5;
@@ -93,50 +94,50 @@ class Amazon_pa_api_v5
      * @return  array       $array
      *
      */
-    public function exec_atoz( array $payload_array = [] )
-    {
-        $keyword_array = [
-            '*'
-            // 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'
-            // 'a','e','i','o','u','x','y','z','t','s'
-        ];
+    // public function exec_atoz( array $payload_array = [] )
+    // {
+    //     $keyword_array = [
+    //         // '*'
+    //         'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'
+    //         // 'a','e','i','o','u','x','y','z','t','s'
+    //     ];
 
-        $collection = [];
-        $out_data = [];
+    //     $collection = [];
+    //     $out_data = [];
 
-        // a - z 検索
-        foreach ($keyword_array as $keyword) {
-            $payload_array["Keywords"] = $keyword;
-            // API exec
-            $data = $this->exec($payload_array);
-            $result_array = $data['SearchResult']['Items'];
+    //     // a - z 検索
+    //     foreach ($keyword_array as $keyword) {
+    //         $payload_array["Keywords"] = $keyword;
+    //         // API exec
+    //         $data = $this->exec($payload_array);
+    //         $result_array = @$data['SearchResult']['Items'];
 
-            // $this->dump( "<h1>{$payload_array["Keywords"]} の結果</h1>" );
-            foreach ($result_array as $k => $v) {
-                // $this->dump( "{$v['ASIN']} : {$v['ItemInfo']['Title']['DisplayValue']}" );
+    //         // $this->dump( "<h1>{$payload_array["Keywords"]} の結果</h1>" );
+    //         foreach ( (array)$result_array as $k => $v ) {
+    //             // $this->dump( "{$v['ASIN']} : {$v['ItemInfo']['Title']['DisplayValue']}" );
 
-                $push_flag = 1;
-                foreach ($collection as $c) {
-                    if ( strcmp($v['ASIN'], $c['ASIN']) == 0 ){
-                        // すでに登録済み
-                        $push_flag = 0;
-                        break;
-                    }
-                }
+    //             $push_flag = 1;
+    //             foreach ($collection as $c) {
+    //                 if ( strcmp($v['ASIN'], $c['ASIN']) == 0 ){
+    //                     // すでに登録済み
+    //                     $push_flag = 0;
+    //                     break;
+    //                 }
+    //             }
 
-                if ( $push_flag == 1 ){
-                        $collection[] = $v;
-                }
-            }
-        }
+    //             if ( $push_flag == 1 ){
+    //                     $collection[] = $v;
+    //             }
+    //         }
+    //     }
 
-        // $this->dump( count($collection) );
-        // $this->dump( $collection );
+    //     // $this->dump( count($collection) );
+    //     // $this->dump( $collection );
 
-        $out_data = $data;
-        $out_data['SearchResult']['Items'] = $collection;
-        return $out_data;
-    }
+    //     $out_data = $data;
+    //     $out_data['SearchResult']['Items'] = $collection;
+    //     return $out_data;
+    // }
 
 
 
@@ -247,7 +248,7 @@ OFF*/
         for ($i=1; $i <= $this->optionRetryMax; $i++) {
 			$my_exec_time = microtime(true);
             $now_time = $this->format_microtime($my_exec_time,"e T P : Y-m-d H:i:s");
-            if ($this->dumpMode == 1){ $this->dump( $i."回目のトライです ({$now_time})" ); }
+            if ($this->dumpMode == 1){ $this->dump( $i." : TRY: ({$now_time})" ); }
             $response = $client->post($url, [
                 'http_errors' => false ,
                 // 'debug'   => true ,
@@ -304,7 +305,9 @@ OFF*/
                 $this->dump( "Amazon_pa_api Cache Save Error : Check this directory -> [{$this->optionCacheDir}]" );
             }
             if ( $this->cache ){
-                $this->dump( "キャッシュに保存しました。: {$cache_id}" );
+                if( $this->dumpMode == 1 ){
+                    $this->dump( "Cache file saved. : {$cache_id}" );
+                }
             }
 		}
 
@@ -342,9 +345,9 @@ OFF*/
         $cache_data = null;
         $cache_data = $this->cache->get($cache_id);
 		if( $cache_data != false ){
-            if( $this->optionCache == 1 ){
+            if( $this->dumpMode == 1 ){
                 $this->dump('Cache matched: ',"_get_cache('{$cache_id}')");
-                // $this->dump( $cache_data,'取得したキャッシュデータ' );
+                // $this->dump( $cache_data,'Cache Data' );
 			}
             return array(1, $cache_data);
 		}
@@ -380,53 +383,53 @@ OFF*/
      */
     public function vdump()
     {
-        // 全引数の var_dump() の出力内容を変数に取り出し
-        ob_start();
-        foreach (func_get_args() as $arg) {
-            var_dump($arg);
-        }
-        $dump = ob_get_clean();
+        // // 全引数の var_dump() の出力内容を変数に取り出し
+        // ob_start();
+        // foreach (func_get_args() as $arg) {
+        //     var_dump($arg);
+        // }
+        // $dump = ob_get_clean();
 
-        // 可読性のためインデント幅を2倍に (2 -> 4)
-        $dump = preg_replace_callback(
-            '/^\s++/m',
-            function ($m) {
-                return str_repeat(" ", strlen($m[0]) * 2);
-            },
-            $dump
-        );
+        // // 可読性のためインデント幅を2倍に (2 -> 4)
+        // $dump = preg_replace_callback(
+        //     '/^\s++/m',
+        //     function ($m) {
+        //         return str_repeat(" ", strlen($m[0]) * 2);
+        //     },
+        //     $dump
+        // );
 
-        // この関数の呼び出し元を取得 （ファイルパス・行番号）
-        $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1)[0];
+        // // この関数の呼び出し元を取得 （ファイルパス・行番号）
+        // $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1)[0];
 
-        // ヘッダーの HTML を生成
-        $header = sprintf('<pre style="%s">', implode(';', [
-            'overflow: scroll',
-            'margin: 10px 0 0 0',
-            'border: 1px solid #bbb',
-            'padding: 6px',
-            'solid: #bbb',
-            'text-align: left',
-            'background: #fdfdfd',
-            'color: #000',
-            'font-family: monospace,serif',
-            'font-size: 13px',
-        ]));
-        $header .= sprintf('<span style="%s">%s:%d</span>',
-            implode(';', ['font-weight: bold']),
-            $caller['file'],
-            $caller['line']
-        );
-        $header .= PHP_EOL;
+        // // ヘッダーの HTML を生成
+        // $header = sprintf('<pre style="%s">', implode(';', [
+        //     'overflow: scroll',
+        //     'margin: 10px 0 0 0',
+        //     'border: 1px solid #bbb',
+        //     'padding: 6px',
+        //     'solid: #bbb',
+        //     'text-align: left',
+        //     'background: #fdfdfd',
+        //     'color: #000',
+        //     'font-family: monospace,serif',
+        //     'font-size: 13px',
+        // ]));
+        // $header .= sprintf('<span style="%s">%s:%d</span>',
+        //     implode(';', ['font-weight: bold']),
+        //     $caller['file'],
+        //     $caller['line']
+        // );
+        // $header .= PHP_EOL;
 
-        // フッターの HTML を生成
-        $footer = '</pre>' . PHP_EOL;
+        // // フッターの HTML を生成
+        // $footer = '</pre>' . PHP_EOL;
 
-        // ダンプ内容を出力 (CLI で実行された場合は HTML タグを取り除く)
-        $isCli = (php_sapi_name() === 'cli');
-        echo $isCli ? strip_tags($header) : $header;
-        echo $dump;
-        echo $isCli ? strip_tags($footer) : $footer;
+        // // ダンプ内容を出力 (CLI で実行された場合は HTML タグを取り除く)
+        // $isCli = (php_sapi_name() === 'cli');
+        // echo $isCli ? strip_tags($header) : $header;
+        // echo $dump;
+        // echo $isCli ? strip_tags($footer) : $footer;
     }
 
 
