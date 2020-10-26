@@ -7,6 +7,7 @@
 /*
     @version        0.5     a 〜 z連続 検索追加
     @version        0.6     [del]exec_atoz
+    @version        0.7     [fix]]細かい修正
 */
 
 namespace Akat03\Amazon_pa_api_v5;
@@ -274,7 +275,9 @@ OFF*/
                     $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
                     return $array;
                 }
-                elseif ( $array['Errors'][0]['Code'] === 'InvalidParameterValue' ){
+                elseif ( $array['Errors'][0]['Code'] === 'InvalidParameterValue' ||
+                         $array['Errors'][0]['Code'] === 'ItemNotAccessible'
+                ){
                     // Error
                     $this->hasError = true;
                     $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
