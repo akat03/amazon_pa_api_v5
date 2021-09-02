@@ -41,7 +41,6 @@ class Amazon_pa_api_v5
 
     public $dumpMode;
 
-
     public $hasError;
     public $errorMessage;
 
@@ -49,9 +48,9 @@ class Amazon_pa_api_v5
     {
         $this->dumpMode = 0;
 
-        $this->optionRetryMax = 3;              // x times retry
+        $this->optionRetryMax = (@$option['optionRetryMax']) ? $option['optionRetryMax'] : 10; // x times retry
         $this->optionShowRetryError = true;		// Show Throttle Error Message
-        $this->optionAccessWait = 2;            // second(s)
+        $this->optionAccessWait = (@$option['optionAccessWait']) ? $option['optionAccessWait'] : 1;            // second(s)
 
         $this->optionCache         = @$option['optionCache'];
         $this->optionCacheDir      = @$option['optionCacheDir'];
@@ -146,7 +145,6 @@ class Amazon_pa_api_v5
      * execute accessing to PA-API V5
      *
      * @param   array       $payload_array
-     *
      * @return  array       $array
      *
      */
@@ -205,26 +203,6 @@ class Amazon_pa_api_v5
         $url = 'https://' . $host . $uriPath;
 
 
-
-/*OFF
-        // 1. file_get_contents
-        $params = array(
-            'http' => array(
-                'header' => $headerString,
-                'method' => 'POST',
-                'content' => $payload,
-            ),
-            'ssl' => [
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-            ],
-        );
-        $stream = stream_context_create($params);
-        $data = file_get_contents($url, false, $stream);
-        $this->dump($data); die;
-OFF*/
-
-
         // 2. guzzle
         // ===== guzzle handler
         // $handler_stack = HandlerStack::create();
@@ -245,6 +223,7 @@ OFF*/
 
         $response = null;
         $data     = '';
+        $i=1;
 
         for ($i=1; $i <= $this->optionRetryMax; $i++) {
 			$my_exec_time = microtime(true);
@@ -264,7 +243,7 @@ OFF*/
                 // $this->dump($array['Errors']);
                 if ( $array['Errors'][0]['Code'] === 'TooManyRequests' ){
                     if ( $this->optionShowRetryError ){
-                        print("<div style='font-weight:bold;'>API ERROR: TooManyRequests: retry after " .$this->optionAccessWait. " second(s). </div>");
+                        print("<div style='font-weight:bold;'>API ERROR: TooManyRequests: retry after " .$this->optionAccessWait. " second(s). </div>\n");
                         // $this->dump( $this->optionAccessWait );
                         sleep( $this->optionAccessWait );
                     }
@@ -300,16 +279,33 @@ OFF*/
         	throw new \Exception("JSON DECODE ERROR in API json response");
         }
 
+        if ( strcmp($data, '') == 0 ){
+            $this->dump( $i );
+            $this->dump( $this->optionRetryMax );
+            die('TooManyRequests error');
+        
+        }
+
+
+
 
         // set cache
 		if( $this->optionCache == 1 ){
-			$rt = $this->cache->save($array,$cache_id);
-			if( !$rt ){
+
+            $this->dump( "キャッシュが有効です" );
+
+            $rt = $this->cache->save($array,$cache_id);
+
+            $this->dump( $rt,'rt' );
+            $this->dump( $array,'array' );
+            $this->dump( $cache_id,'cache_id' );
+
+            if( !$rt ){
                 $this->dump( "Amazon_pa_api Cache Save Error : Check this directory -> [{$this->optionCacheDir}]" );
             }
             if ( $this->cache ){
                 if( $this->dumpMode == 1 ){
-                    $this->dump( "Cache file saved. : {$cache_id}" );
+                    $this->dump( "● Cache file saved. : {$cache_id}" );
                 }
             }
 		}
@@ -329,6 +325,179 @@ OFF*/
         return $array;
 
     }
+
+
+
+    /**
+     * 10件までまとめて検索する
+     *
+     * @param   array       $payload_array
+     * @return  array       $array
+     *
+     */
+    public function exec_multi( array $payload_array = [] )
+    {
+        if ( empty($payload_array) ) {
+            throw new Exception('------------引数($payload_array)がありません！！------------');
+        }
+
+        $payload_array['PartnerTag'] = $this->partnerTag;
+        $payload_array['PartnerType'] = $this->partnerType;
+        $payload_array['Marketplace'] = $this->marketplace;
+
+        $payload = json_encode($payload_array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        // get Cache
+        $cache_id = sha1( $payload );
+        $cache_exists = 0;
+        $array = [];
+        if( $this->optionCache == 1 ){
+            list($cache_exists, $array) = $this->_get_cache( $cache_id );
+		}
+        if ( $cache_exists == 1 ){
+            $array['_cache_matched'] = 1;
+			return $array;
+		}
+
+
+        $host = "webservices.amazon.co.jp";
+        $uriPath = $this->uriPath;
+        $awsv4 = new AwsV4($this->accessKey, $this->secretKey);
+        $awsv4->setRegionName($this->region);
+        $awsv4->setServiceName($this->serviceName);
+        $awsv4->setPath($uriPath);
+        $awsv4->setPayload($payload);
+        $awsv4->setRequestMethod("POST");
+        $awsv4->addHeader('content-encoding', 'amz-1.0');
+        $awsv4->addHeader('content-type', 'application/json; charset=utf-8');
+        $awsv4->addHeader('host', $host);
+        $awsv4->addHeader('x-amz-target', $this->target);
+        $headers = $awsv4->getHeaders();
+        $headerString = "";
+        foreach ($headers as $key => $value) {
+            $headerString .= $key . ': ' . $value . "\r\n";
+        }
+
+        $url = 'https://' . $host . $uriPath;
+
+        $client = new \GuzzleHttp\Client([
+            // [\GuzzleHttp\RequestOptions::VERIFY => false]
+        ]);
+
+        $this->hasError = false;
+        $this->errorMessage = null;
+
+        $response = null;
+        $data     = '';
+        $i=1;
+
+        for ($i=1; $i <= $this->optionRetryMax; $i++) {
+			$my_exec_time = microtime(true);
+            $now_time = $this->format_microtime($my_exec_time,"e T P : Y-m-d H:i:s");
+            if ($this->dumpMode == 1){ $this->dump( $i." : TRY: ({$now_time})" ); }
+            $response = $client->post($url, [
+                'http_errors' => false ,
+                // 'debug'   => true ,
+                'headers' => $headers,
+                'body'    => $payload,
+            ] );
+            $data = (string) $response->getBody();
+	        $array = json_decode($data, true);
+
+            // on Error
+            if ( isset($array['Errors']) ){
+                if ( $array['Errors'][0]['Code'] === 'TooManyRequests' ){
+                    if ( $this->optionShowRetryError ){
+                        print("<div style='font-weight:bold;'>API ERROR: TooManyRequests: retry after " .$this->optionAccessWait. " second(s). </div>\n");
+                        sleep( $this->optionAccessWait );
+                    }
+                }
+                elseif ( $array['Errors'][0]['Code'] === 'NoResults' ){
+                    // Error
+                    $this->hasError = true;
+                    $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
+                    return $array;
+                }
+                elseif ( $array['Errors'][0]['Code'] === 'InvalidParameterValue' ||
+                         $array['Errors'][0]['Code'] === 'ItemNotAccessible'
+                ){
+                    // Error
+                    // $this->hasError = true;
+                    // $this->errorMessage = 'Amazon_pa_api_v5 ERROR: ' . $array['Errors'][0]['Message'];
+                    // return $array;
+                    break;
+                }
+                else {
+                    $this->hasError = true;
+                    $this->errorMessage = $array['Errors'][0]['Message'];
+                    throw new \Exception("API ERROR: Code: " . $array['Errors'][0]['Code'] . ' Message: '. $array['Errors'][0]['Message']);
+                    die;
+                }
+            }
+            // on Success
+            else {
+                break;
+            }
+        }
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+        	throw new \Exception("JSON DECODE ERROR in API json response");
+        }
+
+        if ( strcmp($data, '') == 0 ){
+            $this->dump( $i );
+            $this->dump( $this->optionRetryMax );
+            die('TooManyRequests error');
+        }
+
+        // 返却配列の作成
+        $out_array = [];
+        if ( isset($array['Errors']) ){
+            $out_array['Errors'] = $array['Errors'];
+        }
+
+        $out_array['result_ASINs'] = [];
+        $out_array['ASINs'] = [];
+
+        // if ( $array['ItemsResult']['Items'] !== null ){
+            foreach ( $array['ItemsResult']['Items'] as $v ) {
+                $asin = $v['ASIN'];
+                array_push( $out_array['result_ASINs'], $asin );
+                $out_array['ASINs'][$asin] = $v;
+            }
+        // }
+
+
+
+        // set cache
+		if( $this->optionCache == 1 ){
+            $rt = $this->cache->save($out_array,$cache_id);
+            if( !$rt ){
+                $this->dump( "Amazon_pa_api Cache Save Error : Check this directory -> [{$this->optionCacheDir}]" );
+            }
+            if ( $this->cache ){
+                if( $this->dumpMode == 1 ){
+                    $this->dump( "● Cache file saved. : {$cache_id}" );
+                }
+            }
+		}
+
+        // if ( $this->optionCache ){
+        //     // cache
+        //     phpFastCache::$storage = "files";
+        //     phpFastCache::$path = $this->optionCacheDir;
+
+        //     $cache_id = sha1( serialize($array) );
+        //     $this->dump( $cache_id ); die;
+        //     if($array != null) {
+        //         phpFastCache::set($cache_id, $array, $this->optionCacheLifetime);
+        //     }
+        // }
+
+        return $out_array;
+
+    }
+
 
 
 
