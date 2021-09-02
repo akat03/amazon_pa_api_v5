@@ -8,6 +8,7 @@
     @version        0.5     a 〜 z連続 検索追加
     @version        0.6     [del]exec_atoz
     @version        0.7     [fix]]細かい修正
+    @version        0.8     [fix]]デフォルトパラメーター変更
 */
 
 namespace Akat03\Amazon_pa_api_v5;
